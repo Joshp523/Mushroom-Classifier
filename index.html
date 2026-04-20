@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shroom Scout — Mushroom Classifier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F5F0E8;
+      --surface: #FDFAF4;
+      --card: #FFFFFF;
+      --text: #1A1A14;
+      --text-muted: #6B6B5A;
+      --text-faint: #9E9E8A;
+      --border: rgba(60,55,30,0.12);
+      --border-strong: rgba(60,55,30,0.22);
+      --green: #2D6A4F;
+      --green-light: #D8F3DC;
+      --green-text: #1B4332;
+      --red: #BC4749;
+      --red-light: #FDECEA;
+      --red-text: #7D1F20;
+      --accent: #5C4A1E;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-top: 1rem;
+    }
+
+    .logo-icon {
+      font-size: 48px;
+      display: block;
+      margin-bottom: 0.5rem;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(2rem, 6vw, 2.8rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      line-height: 1.1;
+    }
+
+    h1 em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .tagline {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-weight: 300;
+      letter-spacing: 0.03em;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .drop-zone {
+      border: 1.5px dashed var(--border-strong);
+      border-radius: var(--radius-sm);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s, border-color 0.2s;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      background: #EDE8DC;
+      border-color: var(--accent);
+    }
+
+    .drop-zone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon { font-size: 28px; margin-bottom: 10px; display: block; }
+
+    .drop-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .drop-sub {
+      font-size: 13px;
+      color: var(--text-faint);
+      margin-top: 4px;
+    }
+
+    #preview-img {
+      display: none;
+      width: 100%;
+      max-height: 280px;
+      object-fit: contain;
+      border-radius: var(--radius-sm);
+      margin-top: 1rem;
+    }
+
+    .controls {
+      margin-top: 1.25rem;
+    }
+
+    .threshold-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .threshold-row label {
+      font-size: 13px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      min-width: 70px;
+    }
+
+    .threshold-row input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: var(--border-strong);
+      border-radius: 99px;
+      outline: none;
+    }
+
+    .threshold-row input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: 2px solid white;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+
+    .threshold-val {
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 34px;
+      color: var(--accent);
+    }
+
+    .threshold-hint {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin-top: 5px;
+    }
+
+    #analyze-btn {
+      display: none;
+      width: 100%;
+      margin-top: 1.25rem;
+      padding: 0.85rem;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: 'DM Sans', sans-serif;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--accent);
+      background: var(--accent);
+      color: #FDF9F0;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      letter-spacing: 0.01em;
+    }
+
+    #analyze-btn:hover { background: #4A3A14; }
+    #analyze-btn:active { transform: scale(0.98); }
+    #analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #result-card {
+      display: none;
+      margin-top: 1.25rem;
+      border-radius: var(--radius-sm);
+      padding: 1.25rem;
+      border: 1.5px solid transparent;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    #result-card.edible {
+      background: var(--green-light);
+      border-color: #95D5B2;
+    }
+
+    #result-card.poisonous {
+      background: var(--red-light);
+      border-color: #F5C6C7;
+    }
+
+    .result-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .result-badge {
+      font-size: 24px;
+    }
+
+    .result-label {
+      font-family: 'Instrument Serif', serif;
+      font-size: 22px;
+      font-weight: 400;
+    }
+
+    .result-label.edible { color: var(--green-text); }
+    .result-label.poisonous { color: var(--red-text); }
+
+    .result-sub {
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .result-sub.edible { color: var(--green); }
+    .result-sub.poisonous { color: var(--red); }
+
+    .bar-wrap { margin-top: 10px; }
+
+    .bar-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+
+    .bar-track {
+      height: 6px;
+      background: rgba(0,0,0,0.08);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .bar-fill.edible { background: var(--green); }
+    .bar-fill.poisonous { background: var(--red); }
+
+    #status-msg {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 1rem;
+      min-height: 18px;
+    }
+
+    .warning {
+      margin-top: 2rem;
+      max-width: 480px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-faint);
+      line-height: 1.6;
+      padding: 0 1rem;
+    }
+
+    .warning strong {
+      display: block;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    footer {
+      margin-top: 3rem;
+      font-size: 12px;
+      color: var(--text-faint);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <span class="logo-icon">🍄</span>
+    <h1>Shroom <em>Scout</em></h1>
+    <p class="tagline">AI-powered mushroom safety classifier</p>
+  </header>
+
+  <div class="card">
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="image/*" capture="environment">
+      <span class="drop-icon">📷</span>
+      <p class="drop-title">Tap to take a photo or upload</p>
+      <p class="drop-sub">JPG, PNG, HEIC — runs entirely on your device</p>
+      <img id="preview-img" alt="Mushroom preview">
+    </div>
+
+    <div class="controls">
+      <div class="threshold-row">
+        <label for="threshold-slider">Sensitivity</label>
+        <input type="range" id="threshold-slider" min="10" max="70" value="30" step="1">
+        <span class="threshold-val" id="threshold-val">0.30</span>
+      </div>
+      <p class="threshold-hint">Lower = more cautious, flags more mushrooms as poisonous</p>
+    </div>
+
+    <button id="analyze-btn" disabled>Analyze mushroom</button>
+
+    <div id="result-card">
+      <div class="result-top">
+        <span class="result-badge" id="result-badge">✅</span>
+        <div>
+          <p class="result-label" id="result-label">Edible</p>
+          <p class="result-sub" id="result-sub">Likely safe to eat</p>
+        </div>
+      </div>
+      <div class="bar-wrap">
+        <p class="bar-label" id="bar-label">Confidence: 0%</p>
+        <div class="bar-track">
+          <div class="bar-fill" id="bar-fill" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="status-msg"></div>
+  </div>
+
+  <div class="warning">
+    <strong>⚠️ Safety disclaimer</strong>
+    This tool is for educational purposes only. Never eat a wild mushroom based solely on an AI prediction. Always consult an expert mycologist before consuming any foraged mushroom.
+  </div>
+
+  <footer>Built with PyTorch + ONNX Runtime Web &nbsp;·&nbsp; runs 100% in your browser</footer>
+
+  <script>
+    const fileInput = document.getElementById('file-input');
+    const dropZone = document.getElementById('drop-zone');
+    const previewImg = document.getElementById('preview-img');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const resultCard = document.getElementById('result-card');
+    const resultBadge = document.getElementById('result-badge');
+    const resultLabel = document.getElementById('result-label');
+    const resultSub = document.getElementById('result-sub');
+    const barLabel = document.getElementById('bar-label');
+    const barFill = document.getElementById('bar-fill');
+    const statusMsg = document.getElementById('status-msg');
+    const thresholdSlider = document.getElementById('threshold-slider');
+    const thresholdValEl = document.getElementById('threshold-val');
+
+    let session = null;
+    let currentImageTensor = null;
+
+    thresholdSlider.addEventListener('input', () => {
+      thresholdValEl.textContent = (thresholdSlider.value / 100).toFixed(2);
+    });
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    function handleFile(file) {
+      const url = URL.createObjectURL(file);
+      previewImg.src = url;
+      previewImg.style.display = 'block';
+      analyzeBtn.style.display = 'block';
+      analyzeBtn.disabled = false;
+      resultCard.style.display = 'none';
+      resultCard.className = '';
+      statusMsg.textContent = '';
+      currentImageTensor = null;
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 224; canvas.height = 224;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, 224, 224);
+        const data = ctx.getImageData(0, 0, 224, 224).data;
+        const mean = [0.485, 0.456, 0.406];
+        const std  = [0.229, 0.224, 0.225];
+        const tensor = new Float32Array(3 * 224 * 224);
+        for (let i = 0; i < 224 * 224; i++) {
+          tensor[i]               = ((data[i*4]   / 255) - mean[0]) / std[0];
+          tensor[i + 224*224]     = ((data[i*4+1] / 255) - mean[1]) / std[1];
+          tensor[i + 224*224*2]   = ((data[i*4+2] / 255) - mean[2]) / std[2];
+        }
+        currentImageTensor = tensor;
+      };
+      img.src = url;
+    }
+
+    async function loadModel() {
+      if (session) return session;
+      statusMsg.textContent = 'Loading model...';
+      try {
+        session = await ort.InferenceSession.create('mushroom_classifier.onnx');
+        statusMsg.textContent = '';
+        return session;
+      } catch (e) {
+        statusMsg.textContent = 'Could not load mushroom_classifier.onnx — make sure it is in the same folder as this file.';
+        throw e;
+      }
+    }
+
+    analyzeBtn.addEventListener('click', async () => {
+      if (!currentImageTensor) {
+        statusMsg.textContent = 'Image still loading, please wait a moment.';
+        return;
+      }
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '<span class="spinner"></span>Analyzing...';
+      resultCard.style.display = 'none';
+      statusMsg.textContent = '';
+
+      try {
+        const sess = await loadModel();
+        const inputTensor = new ort.Tensor('float32', currentImageTensor, [1, 3, 224, 224]);
+        const results = await sess.run({ image: inputTensor });
+        const logits = results.logits.data;
+
+        function softmax(a, b) {
+          const ea = Math.exp(a - Math.max(a, b));
+          const eb = Math.exp(b - Math.max(a, b));
+          const sum = ea + eb;
+          return [ea / sum, eb / sum];
+        }
+
+        const [pEdible, pPoison] = softmax(logits[0], logits[1]);
+        const threshold = thresholdSlider.value / 100;
+        const isPoisonous = pPoison > threshold;
+        const conf = Math.round((isPoisonous ? pPoison : pEdible) * 100);
+
+        resultCard.style.display = 'block';
+        resultCard.className = isPoisonous ? 'poisonous' : 'edible';
+        resultBadge.textContent = isPoisonous ? '☠️' : '✅';
+        resultLabel.className = 'result-label ' + (isPoisonous ? 'poisonous' : 'edible');
+        resultSub.className   = 'result-sub '   + (isPoisonous ? 'poisonous' : 'edible');
+        resultLabel.textContent = isPoisonous ? 'Poisonous' : 'Edible';
+        resultSub.textContent   = isPoisonous
+          ? 'Do not eat this mushroom.'
+          : 'Likely safe — but always double-check with an expert.';
+        barLabel.textContent = 'Confidence: ' + conf + '%';
+        barFill.className = 'bar-fill ' + (isPoisonous ? 'poisonous' : 'edible');
+        barFill.style.width = conf + '%';
+
+      } catch (e) {
+        if (!statusMsg.textContent) statusMsg.textContent = 'Error: ' + e.message;
+      }
+
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = 'Analyze mushroom';
+    });
+  </script>
+</body>
+</html>
