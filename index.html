@@ -457,7 +457,9 @@
       if (session) return session;
       statusMsg.textContent = 'Loading model...';
       try {
-        session = await ort.InferenceSession.create('mushroom_classifier.onnx');
+        session = await ort.InferenceSession.create('mushroom_classifier.onnx', {
+          executionProviders: ['wasm']
+        });
         statusMsg.textContent = '';
         return session;
       } catch (e) {
