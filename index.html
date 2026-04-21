@@ -464,7 +464,7 @@
         statusMsg.textContent = '';
         return session;
       } catch (e) {
-        statusMsg.textContent = 'Could not load mushroom_classifier.onnx — make sure it is in the same folder as this file.';
+        statusMsg.textContent = 'Error: ' + e.message;
         throw e;
       }
     }
