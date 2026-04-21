@@ -482,8 +482,8 @@
       try {
         const sess = await loadModel();
         const inputTensor = new ort.Tensor('float32', currentImageTensor, [1, 3, 224, 224]);
-        const results = await sess.run({ image: inputTensor });
-        const logits = results.logits.data;
+        const results = await sess.run({ x: inputTensor });   // ← fixed: was "image"
+        const logits = results.linear.data;                   // ← fixed: was "logits"
 
         function softmax(a, b) {
           const ea = Math.exp(a - Math.max(a, b));
