@@ -9,7 +9,7 @@
     onnxruntime-web 1.18.0 — stable, well-tested with opset 17.
     We load the WASM backend (works in any modern browser, no GPU needed).
   -->
-  <script src="https://unpkg.com/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
+  <script src="https://unpkg.com/onnxruntime-web@1.14.0/dist/ort.min.js"></script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -413,7 +413,7 @@
   async function loadModel() {
     try {
       // Use WASM backend — works in all modern browsers without WebGL
-      ort.env.wasm.wasmPaths = 'https://unpkg.com/onnxruntime-web@1.18.0/dist/';
+      ort.env.wasm.wasmPaths = 'https://unpkg.com/onnxruntime-web@1.14.0/dist/';
       session = await ort.InferenceSession.create(MODEL_URL, {
         executionProviders: ['wasm'],
       });
