@@ -6,7 +6,7 @@
   <title>Forager — Mushroom Classifier</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
+  <script src="ort.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -458,7 +458,7 @@
       statusMsg.textContent = 'Loading model...';
       try {
         ort.env.wasm.numThreads = 1;
-        ort.env.wasm.wasmPaths = 'https://unpkg.com/onnxruntime-web@1.16.3/dist/';
+        ort.env.wasm.wasmPaths = './';
         session = await ort.InferenceSession.create('mushroom_classifier.onnx', {
           executionProviders: ['wasm']
         });
