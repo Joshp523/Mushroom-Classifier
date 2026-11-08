@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Shroom Sleuth</title>
+<title>Mushroom Classifier</title>
 <meta name="theme-color" content="#0c0f0a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Shroom Sleuth">
+<meta name="apple-mobile-web-app-title" content="Classifier">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
@@ -53,7 +53,7 @@ footer{text-align:center;color:var(--muted);font:400 11px 'DM Mono',monospace;le
 </head>
 <body>
 <div class="wrap">
-  <header><img src="icon-192.png" alt=""><h1>Shroom Sleuth</h1><p class="tag">Neural mushroom classifier</p></header>
+  <header><img src="icon-192.png" alt=""><h1>Mushroom Classifier</h1><p class="tag">Neural net mushroom classifier</p></header>
 
   <div class="status"><span class="dot loading" id="dot"></span><span id="st">Loading the model…</span></div>
   <div class="prog" id="prog" hidden><i id="bar"></i></div>
@@ -70,7 +70,7 @@ footer{text-align:center;color:var(--muted);font:400 11px 'DM Mono',monospace;le
       <div class="verdict" id="vd"></div>
       <div class="row"><div class="l"><span>RESEMBLES EDIBLE</span><span id="pe"></span></div><div class="track"><i id="be" style="background:var(--safe)"></i></div></div>
       <div class="row"><div class="l"><span>RESEMBLES POISONOUS</span><span id="pp"></span></div><div class="track"><i id="bp" style="background:var(--danger)"></i></div></div>
-      <div class="warn"><b>Never eat a wild mushroom based on this app.</b> It is a student model trained on limited data, and a single mistake can be fatal. Have any mushroom you plan to eat identified in person by an expert.</div>
+      <div class="warn"><b>Never eat a wild mushroom based solely on this app.</div>
     </div>
     <button class="btn again" id="again">Try another photo</button>
   </div>
