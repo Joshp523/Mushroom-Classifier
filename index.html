@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mushroom Classifier</title>
+<title>Shroom Sleuth</title>
 <meta name="theme-color" content="#0c0f0a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Classifier">
+<meta name="apple-mobile-web-app-title" content="Shroom Sleuth">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
@@ -43,6 +43,10 @@ input[type=file]{display:none}
 .verdict.safe{color:var(--safe)}.verdict.danger{color:var(--danger)}
 .row{margin-top:14px}.row .l{display:flex;justify-content:space-between;font:400 12px 'DM Mono',monospace;letter-spacing:.08em;color:var(--muted)}
 .track{height:8px;background:var(--border);border-radius:8px;overflow:hidden;margin-top:6px}.track i{display:block;height:100%;width:0;transition:width .6s}
+.risk{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.risk .cap{font:500 15px 'DM Sans',sans-serif}.risk .l{display:flex;justify-content:space-between;font:400 12px 'DM Mono',monospace;letter-spacing:.06em;color:var(--muted);margin-top:4px}
+.risk input{width:100%;margin-top:10px;accent-color:var(--accent);height:28px}
+.raw{margin-top:10px;font:400 12px 'DM Mono',monospace;color:var(--muted)}
 .warn{margin-top:16px;padding:12px 14px;border-left:3px solid var(--danger);background:#e05a3a14;font-size:15px}
 .warn b{font-weight:500}
 .again{margin-top:14px;width:100%}
@@ -53,7 +57,7 @@ footer{text-align:center;color:var(--muted);font:400 11px 'DM Mono',monospace;le
 </head>
 <body>
 <div class="wrap">
-  <header><img src="icon-192.png" alt=""><h1>Mushroom Classifier</h1><p class="tag">Neural net mushroom classifier</p></header>
+  <header><img src="icon-192.png" alt=""><h1>Shroom Sleuth</h1><p class="tag">Neural mushroom classifier</p></header>
 
   <div class="status"><span class="dot loading" id="dot"></span><span id="st">Loading the model…</span></div>
   <div class="prog" id="prog" hidden><i id="bar"></i></div>
@@ -70,7 +74,11 @@ footer{text-align:center;color:var(--muted);font:400 11px 'DM Mono',monospace;le
       <div class="verdict" id="vd"></div>
       <div class="row"><div class="l"><span>RESEMBLES EDIBLE</span><span id="pe"></span></div><div class="track"><i id="be" style="background:var(--safe)"></i></div></div>
       <div class="row"><div class="l"><span>RESEMBLES POISONOUS</span><span id="pp"></span></div><div class="track"><i id="bp" style="background:var(--danger)"></i></div></div>
-      <div class="warn"><b>Never eat a wild mushroom based solely on this app.</div>
+      <div class="risk"><div class="cap">Feeling lucky? Choose your risk tolerance.</div>
+        <input type="range" id="th" min="1" max="99" step="1" value="50" aria-label="Risk tolerance">
+        <div class="l"><span>CAUTIOUS</span><span id="thv"></span><span>LUCKY</span></div>
+        <div class="raw" id="raw"></div></div>
+      <div class="warn"><b>Never eat a wild mushroom based on this app.</b> It is a student model trained on limited data, and a single mistake can be fatal. Have any mushroom you plan to eat identified in person by an expert.</div>
     </div>
     <button class="btn again" id="again">Try another photo</button>
   </div>
@@ -82,7 +90,10 @@ footer{text-align:center;color:var(--muted);font:400 11px 'DM Mono',monospace;le
 <script>
 // Must match the notebook's validation transforms.
 const MEAN=[0.485,0.456,0.406],STD=[0.229,0.224,0.225],SIZE=224;
-let TH=null;                // chance-of-poison cut-off chosen in training (model.json); flags ~98% of poisonous test photos
+// Verdict: poisonous when the model's poisonous share (softmax of its two output scores) is above the slider.
+// 50% = whichever of the model's two scores is higher. Lower = more cautious, higher = more lucky.
+let TH=50;try{TH=+localStorage.getItem('shroom_th')||50}catch(e){}
+let LAST=null;
 const CENTER_CROP=false;    // set true if val_transforms used Resize(256)+CenterCrop(224); false = squash whole photo to 224x224
 const $=id=>document.getElementById(id);
 let session=null;
@@ -93,7 +104,7 @@ function status(state,msg){$('dot').className='dot '+state;$('st').textContent=m
 async function loadModel(){
   try{
     ort.env.wasm.wasmPaths='./';ort.env.wasm.numThreads=1;   // GitHub Pages can't enable threads
-    const meta=await (await fetch('model.json')).json();TH=meta.threshold??null;
+    const meta=await (await fetch('model.json')).json();
     const buf=new Uint8Array(meta.bytes);let got=0;$('prog').hidden=false;
     for(let i=0;i<meta.parts;i++){
       const r=await fetch('model.part'+i);if(!r.ok)throw new Error('model.part'+i+' is missing ('+r.status+')');
@@ -126,14 +137,17 @@ async function classify(file){
   if(!session){$('scan').hidden=true;return}
   await new Promise(r=>setTimeout(r,30));   // let the screen repaint before the heavy work
   try{
-    const out=await session.run({image:toTensor(img)}),l=Array.from(out.logits.data),p=softmax(l),bad=TH!=null?p[1]>TH:l[1]>0.3;
-    $('scan').hidden=true;$('res').hidden=false;
-    $('vd').className='verdict '+(bad?'danger':'safe');$('vd').textContent=bad?'☠ Resembles a poisonous species':'Resembles an edible species';
+    const out=await session.run({image:toTensor(img)}),l=Array.from(out.logits.data),p=softmax(l);LAST={l,p};
+    $('scan').hidden=true;$('res').hidden=false;verdict();
+    $('raw').textContent=`Model scores: edible ${l[0].toFixed(2)} · poisonous ${l[1].toFixed(2)}`;
     $('pe').textContent=(p[0]*100).toFixed(1)+'%';$('pp').textContent=(p[1]*100).toFixed(1)+'%';
     requestAnimationFrame(()=>{$('be').style.width=p[0]*100+'%';$('bp').style.width=p[1]*100+'%'});
     $('res').scrollIntoView({behavior:'smooth',block:'nearest'});
   }catch(e){$('scan').hidden=true;alert('Could not check this photo: '+(e.message||e))}
 }
+function verdict(){$('thv').textContent='poisonous above '+TH+'%';$('th').value=TH;if(!LAST)return;const bad=LAST.p[1]*100>TH;
+  $('vd').className='verdict '+(bad?'danger':'safe');$('vd').textContent=bad?'☠ Resembles a poisonous species':'Resembles an edible species'}
+$('th').oninput=e=>{TH=+e.target.value;try{localStorage.setItem('shroom_th',TH)}catch(x){}verdict()};verdict();
 $('f-cam').onchange=e=>{classify(e.target.files[0]);e.target.value=''};
 $('f-lib').onchange=e=>{classify(e.target.files[0]);e.target.value=''};
 $('again').onclick=()=>{$('out').hidden=true;$('pick').hidden=false;$('be').style.width=$('bp').style.width='0';scrollTo(0,0)};
